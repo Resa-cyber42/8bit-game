@@ -1,0 +1,1521 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>8-BIT: 16 уровней + 3 мини-босса</title>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            margin: 0;
+            background: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+        }
+        #game-container {
+            position: relative;
+            width: 900px;
+            max-width: 100vw;
+            aspect-ratio: 900 / 550;
+            border: 4px solid #444;
+            background: #000;
+            box-shadow: 0 0 30px rgba(0, 255, 100, 0.3);
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            width: 100%; height: 100%;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        #hud {
+            position: absolute;
+            top: 8px; left: 8px;
+            color: #0f0;
+            font-size: clamp(10px, 1.6vw, 14px);
+            text-shadow: 0 0 5px #0f0;
+            pointer-events: none;
+            display: none;
+        }
+        #super-bar {
+            position: absolute;
+            top: 8px; right: 8px;
+            width: clamp(120px, 22vw, 200px);
+            height: 18px;
+            border: 2px solid #ff0;
+            background: #000;
+            pointer-events: none;
+            display: none;
+        }
+        #super-fill {
+            height: 100%; width: 0%;
+            background: linear-gradient(90deg, #ff0, #f80);
+            transition: width 0.1s;
+        }
+        #super-label {
+            position: absolute;
+            top: 30px; right: 8px;
+            color: #ff0;
+            font-size: clamp(9px, 1.4vw, 12px);
+            text-shadow: 0 0 5px #ff0;
+            pointer-events: none;
+            display: none;
+        }
+        #dialog-box {
+            position: absolute;
+            bottom: 20px; left: 20px; right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #0f0;
+            padding: 12px;
+            color: #0f0;
+            font-size: clamp(12px, 1.8vw, 16px);
+            display: none;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+            line-height: 1.4;
+        }
+        #dialog-box .speaker {
+            color: #ff0; font-weight: bold; margin-bottom: 5px;
+        }
+        #dialog-hint {
+            position: absolute;
+            bottom: 4px; right: 12px;
+            color: #888; font-size: 10px;
+        }
+
+        #mobile-controls {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 40%;
+            pointer-events: none;
+            display: none;
+        }
+        .touch-btn {
+            position: absolute;
+            pointer-events: auto;
+            background: rgba(0, 255, 100, 0.15);
+            border: 3px solid rgba(0, 255, 100, 0.7);
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
+            user-select: none;
+            touch-action: none;
+            text-shadow: 0 0 5px #0f0;
+        }
+        .touch-btn:active, .touch-btn.pressed {
+            background: rgba(0, 255, 100, 0.5);
+            box-shadow: 0 0 20px #0f0;
+        }
+        #btn-left { left: 15px; bottom: 20px; width: 70px; height: 70px; font-size: 30px; }
+        #btn-right { left: 100px; bottom: 20px; width: 70px; height: 70px; font-size: 30px; }
+        #btn-shoot {
+            right: 100px; bottom: 20px; width: 80px; height: 80px; font-size: 14px;
+            border-color: rgba(0, 255, 255, 0.7); color: #0ff;
+            background: rgba(0, 255, 255, 0.15); text-shadow: 0 0 5px #0ff;
+        }
+        #btn-shoot:active, #btn-shoot.pressed {
+            background: rgba(0, 255, 255, 0.5); box-shadow: 0 0 20px #0ff;
+        }
+        #btn-super {
+            right: 15px; bottom: 20px; width: 80px; height: 80px; font-size: 14px;
+            border-color: rgba(255, 255, 0, 0.7); color: #ff0;
+            background: rgba(255, 255, 0, 0.15); text-shadow: 0 0 5px #ff0;
+        }
+        #btn-super:active, #btn-super.pressed {
+            background: rgba(255, 255, 0, 0.5); box-shadow: 0 0 20px #ff0;
+        }
+        #btn-super.ready { animation: pulse 1s infinite; }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 5px #ff0; }
+            50% { box-shadow: 0 0 25px #ff0, 0 0 40px #ff0; }
+        }
+        #btn-dialog {
+            position: absolute;
+            right: 20px; top: 50%;
+            transform: translateY(-50%);
+            width: 60px; height: 60px;
+            border-radius: 50%;
+            background: rgba(0, 255, 100, 0.2);
+            border: 3px solid rgba(0, 255, 100, 0.8);
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 12px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            touch-action: none;
+        }
+        #btn-dialog:active { background: rgba(0, 255, 100, 0.5); }
+
+        @media (pointer: coarse) {
+            #mobile-controls { display: block; }
+            #controls-desktop { display: none; }
+        }
+        #controls-desktop {
+            position: absolute;
+            bottom: 5px; left: 10px;
+            color: #666; font-size: 11px;
+            pointer-events: none;
+        }
+
+        #menu-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            padding-bottom: 5%;
+            background: rgba(0, 0, 0, 0.0);
+            z-index: 100;
+        }
+        #menu-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 4%;
+        }
+        .menu-btn {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: clamp(13px, 1.8vw, 18px);
+            color: #0ff;
+            background: rgba(0, 0, 0, 0.75);
+            border: 3px solid #0ff;
+            padding: 8px 35px;
+            text-shadow: 0 0 8px #0ff;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+            cursor: pointer;
+            letter-spacing: 2px;
+            transition: all 0.15s;
+            min-width: 220px;
+            text-align: center;
+            user-select: none;
+        }
+        .menu-btn:hover, .menu-btn:active {
+            background: rgba(0, 255, 255, 0.2);
+            box-shadow: 0 0 25px #0ff, 0 0 50px #0ff;
+            transform: scale(1.05);
+        }
+        .menu-btn.primary {
+            color: #0f0;
+            border-color: #0f0;
+            text-shadow: 0 0 8px #0f0;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.4);
+        }
+        .menu-btn.primary:hover, .menu-btn.primary:active {
+            background: rgba(0, 255, 0, 0.2);
+            box-shadow: 0 0 25px #0f0, 0 0 50px #0f0;
+        }
+
+        .modal {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.92);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            z-index: 200;
+            color: #0f0;
+            text-align: center;
+            overflow-y: auto;
+        }
+        .modal.active { display: flex; }
+        .modal h2 {
+            color: #ff0;
+            font-size: clamp(18px, 2.6vw, 28px);
+            text-shadow: 0 0 10px #ff0;
+            margin: 0 0 15px 0;
+            letter-spacing: 3px;
+        }
+        .modal p {
+            font-size: clamp(12px, 1.6vw, 16px);
+            line-height: 1.6;
+            max-width: 600px;
+            margin: 6px 0;
+        }
+        .modal .hint {
+            color: #888;
+            font-size: 12px;
+            margin-top: 15px;
+        }
+        .modal-close {
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 16px;
+            color: #0ff;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #0ff;
+            padding: 8px 30px;
+            text-shadow: 0 0 8px #0ff;
+            cursor: pointer;
+            letter-spacing: 2px;
+            user-select: none;
+        }
+        .modal-close:active { background: rgba(0, 255, 255, 0.3); }
+
+        #level-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            max-width: 500px;
+            width: 100%;
+            margin: 10px 0;
+        }
+        .level-cell {
+            aspect-ratio: 1;
+            border: 3px solid #0ff;
+            background: rgba(0, 255, 255, 0.1);
+            color: #0ff;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: clamp(14px, 2vw, 20px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            text-shadow: 0 0 8px #0ff;
+            transition: all 0.15s;
+            position: relative;
+            user-select: none;
+        }
+        .level-cell:active { transform: scale(0.95); }
+        .level-cell.boss-level {
+            border-color: #f0f;
+            color: #f0f;
+            background: rgba(255, 0, 255, 0.1);
+            text-shadow: 0 0 8px #f0f;
+        }
+        .level-cell.miniboss-level {
+            border-color: #ff0;
+            color: #ff0;
+            background: rgba(255, 255, 0, 0.1);
+            text-shadow: 0 0 8px #ff0;
+        }
+        .level-cell.locked {
+            border-color: #333;
+            background: rgba(50, 50, 50, 0.3);
+            color: #555;
+            text-shadow: none;
+            cursor: not-allowed;
+        }
+        .level-cell.locked::after {
+            content: '🔒';
+            position: absolute;
+            font-size: 20px;
+        }
+        .level-cell.locked > span { display: none; }
+        .level-cell.completed {
+            border-color: #0f0;
+            background: rgba(0, 255, 0, 0.15);
+            color: #0f0;
+            text-shadow: 0 0 8px #0f0;
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            width: 100%;
+            max-width: 400px;
+            margin: 8px 0;
+            padding: 8px 18px;
+            border: 2px solid #0f0;
+            background: rgba(0, 255, 0, 0.05);
+        }
+        .setting-row span { color: #0f0; font-size: 14px; }
+        .toggle {
+            width: 60px; height: 30px;
+            border-radius: 15px;
+            background: #333;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+            border: 2px solid #0f0;
+            flex-shrink: 0;
+        }
+        .toggle.on { background: rgba(0, 255, 0, 0.4); }
+        .toggle::after {
+            content: '';
+            position: absolute;
+            top: 2px; left: 2px;
+            width: 22px; height: 22px;
+            border-radius: 50%;
+            background: #0f0;
+            transition: left 0.2s;
+            box-shadow: 0 0 10px #0f0;
+        }
+        .toggle.on::after { left: 30px; }
+
+        #btn-pause {
+            position: absolute;
+            top: 8px;
+            right: 220px;
+            width: 40px; height: 40px;
+            border: 2px solid #0ff;
+            background: rgba(0, 0, 0, 0.7);
+            color: #0ff;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            font-family: 'Courier New', monospace;
+            touch-action: none;
+        }
+        #btn-pause:active { background: rgba(0, 255, 255, 0.3); }
+
+        #unlock-toast {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background: rgba(0, 0, 0, 0.95);
+            border: 3px solid #0f0;
+            padding: 20px 40px;
+            color: #0f0;
+            font-size: clamp(14px, 2vw, 20px);
+            text-shadow: 0 0 10px #0f0;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.8);
+            z-index: 300;
+            pointer-events: none;
+            opacity: 0;
+            transition: all 0.4s;
+            text-align: center;
+        }
+        #unlock-toast.show {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+        }
+
+        /* Поле ввода кода */
+        #code-input {
+            font-family: 'Courier New', monospace;
+            font-size: 28px;
+            font-weight: bold;
+            color: #0f0;
+            background: rgba(0, 0, 0, 0.8);
+            border: 3px solid #0f0;
+            padding: 12px 20px;
+            text-align: center;
+            letter-spacing: 8px;
+            text-shadow: 0 0 10px #0f0;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            width: 250px;
+            outline: none;
+        }
+        #code-input:focus {
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.9);
+        }
+        #code-message {
+            margin-top: 15px;
+            font-size: 14px;
+            min-height: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="900" height="550"></canvas>
+
+        <div id="menu-overlay">
+            <div id="menu-buttons">
+                <div class="menu-btn primary" id="btn-play">▶ ИГРАТЬ</div>
+                <div class="menu-btn" id="btn-levels">🗺 УРОВНИ</div>
+                <div class="menu-btn" id="btn-settings">⚙ НАСТРОЙКИ</div>
+                <div class="menu-btn" id="btn-about">ⓘ ОБ ИГРЕ</div>
+            </div>
+        </div>
+
+        <div id="btn-pause">⏸</div>
+
+        <div id="hud">
+            <div>HP: <span id="hp-display">100</span></div>
+            <div>Уровень: <span id="level-display">1</span></div>
+            <div>Супер: <span id="super-count">0</span>/100</div>
+        </div>
+        <div id="super-bar"><div id="super-fill"></div></div>
+        <div id="super-label">SUPER</div>
+        <div id="dialog-box">
+            <div class="speaker" id="speaker-name">8-BIT</div>
+            <div id="dialog-text"></div>
+            <div id="dialog-hint">Нажмите E для продолжения</div>
+        </div>
+        <div id="controls-desktop">A/D — движение | Пробел — выстрел | Q — супер | E — диалог</div>
+
+        <div id="mobile-controls">
+            <div class="touch-btn" id="btn-left">◀</div>
+            <div class="touch-btn" id="btn-right">▶</div>
+            <div class="touch-btn" id="btn-shoot">FIRE</div>
+            <div class="touch-btn" id="btn-super">SUPER</div>
+        </div>
+        <div class="touch-btn" id="btn-dialog">E</div>
+
+        <div id="unlock-toast"></div>
+
+        <div class="modal" id="modal-settings">
+            <h2>НАСТРОЙКИ</h2>
+            <div class="setting-row"><span>🔊 Музыка</span><div class="toggle on" id="toggle-music"></div></div>
+            <div class="setting-row"><span>🔈 Звуки</span><div class="toggle on" id="toggle-sfx"></div></div>
+            <div class="setting-row"><span>📳 Вибрация</span><div class="toggle on" id="toggle-vibe"></div></div>
+            <div class="setting-row"><span>🎯 Автоприцел</span><div class="toggle" id="toggle-autolock"></div></div>
+            <div class="menu-btn" id="btn-code" style="margin-top:15px;font-size:14px;padding:6px 25px;min-width:180px;">🔑 ВВЕСТИ КОД</div>
+            <div class="modal-close" data-close="modal-settings">НАЗАД</div>
+        </div>
+
+        <div class="modal" id="modal-about">
+            <h2>ОБ ИГРЕ</h2>
+            <p><b style="color:#ff0">8-BIT: 16 УРОВНЕЙ</b></p>
+            <p>Сюжетная 2D-игра про 8-Бита из Brawl Stars.</p>
+            <p>16 уровней. На 5, 10 и 15 — <b style="color:#ff0">⭐ мини-боссы</b>. На 16 — <b style="color:#f0f">👹 финальный босс</b>.</p>
+            <p class="hint">A/D или ◀ ▶ — движение, Пробел или FIRE — выстрел, Q или SUPER — турель, E — диалог, ESC или ⏸ — пауза.</p>
+            <p class="hint">Фанатская игра. 8-BIT © Supercell.</p>
+            <div class="modal-close" data-close="modal-about">НАЗАД</div>
+        </div>
+
+        <div class="modal" id="modal-levels">
+            <h2>УРОВНИ</h2>
+            <div id="level-grid"></div>
+            <div class="modal-close" data-close="modal-levels">НАЗАД</div>
+        </div>
+
+        <div class="modal" id="modal-pause">
+            <h2>ПАУЗА</h2>
+            <div class="menu-btn primary" id="btn-resume">▶ ПРОДОЛЖИТЬ</div>
+            <div class="menu-btn" id="btn-restart">🔄 ЗАНОВО</div>
+            <div class="menu-btn" id="btn-to-menu">🏠 В ГЛАВНОЕ МЕНЮ</div>
+        </div>
+
+        <div class="modal" id="modal-level-win">
+            <h2 id="win-title">УРОВЕНЬ ПРОЙДЕН!</h2>
+            <p id="win-text">Следующий уровень разблокирован.</p>
+            <div class="menu-btn primary" id="btn-next-level">▶ СЛЕДУЮЩИЙ УРОВЕНЬ</div>
+            <div class="menu-btn" id="btn-win-to-menu">🏠 В ГЛАВНОЕ МЕНЮ</div>
+        </div>
+
+        <div class="modal" id="modal-game-win">
+            <h2 style="color:#0f0">🏆 ПОБЕДА!</h2>
+            <p>Ты прошёл все 16 уровней!</p>
+            <p>8-Бит снова в строю. СБОЙ СИСТЕМЫ уничтожен.</p>
+            <p class="hint">All I do is win!</p>
+            <div class="menu-btn primary" id="btn-win-restart">▶ ИГРАТЬ СНАЧАЛА</div>
+            <div class="menu-btn" id="btn-win-menu">🏠 В ГЛАВНОЕ МЕНЮ</div>
+        </div>
+
+        <div class="modal" id="modal-code">
+            <h2>ВВЕДИ КОД</h2>
+            <p class="hint" style="margin-bottom:15px;">Введи секретный код, чтобы разблокировать всё</p>
+            <input type="text" id="code-input" maxlength="8" inputmode="numeric" pattern="[0-9]*" placeholder="____">
+            <div id="code-message"></div>
+            <div class="menu-btn primary" id="btn-code-submit" style="margin-top:10px;">✔ ПОДТВЕРДИТЬ</div>
+            <div class="modal-close" data-close="modal-code">НАЗАД</div>
+        </div>
+    </div>
+
+    <audio id="bg-music" loop preload="auto">
+        <source src="music.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const dialogBox = document.getElementById('dialog-box');
+        const speakerName = document.getElementById('speaker-name');
+        const dialogText = document.getElementById('dialog-text');
+        const hpDisplay = document.getElementById('hp-display');
+        const levelDisplay = document.getElementById('level-display');
+        const superCount = document.getElementById('super-count');
+        const superFill = document.getElementById('super-fill');
+        const btnSuper = document.getElementById('btn-super');
+        const btnDialog = document.getElementById('btn-dialog');
+        const menuOverlay = document.getElementById('menu-overlay');
+        const hud = document.getElementById('hud');
+        const superBar = document.getElementById('super-bar');
+        const superLabel = document.getElementById('super-label');
+        const btnPause = document.getElementById('btn-pause');
+        const bgMusic = document.getElementById('bg-music');
+        const unlockToast = document.getElementById('unlock-toast');
+
+        ctx.imageSmoothingEnabled = false;
+
+        // ===== СОХРАНЕНИЕ =====
+        const SAVE_KEY = '8bit_save_v3';
+        const TOTAL_LEVELS = 16;
+        const MINI_BOSS_LEVELS = [5, 10, 15];
+        function defaultSave() {
+            return {
+                unlockedLevel: 1,
+                completed: [],
+                settings: { music: true, sfx: true, vibe: true, autolock: false }
+            };
+        }
+        function loadSave() {
+            try {
+                const s = localStorage.getItem(SAVE_KEY);
+                if (!s) return defaultSave();
+                const data = JSON.parse(s);
+                if (!data.settings) data.settings = defaultSave().settings;
+                if (!data.completed) data.completed = [];
+                if (!data.unlockedLevel) data.unlockedLevel = 1;
+                return data;
+            } catch (e) { return defaultSave(); }
+        }
+        function writeSave(data) {
+            try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) {}
+        }
+        let save = loadSave();
+
+        // ===== СПРАЙТЫ =====
+        const sprite8Bit = new Image(); sprite8Bit.src = '8bit.png';
+        const spriteBoss = new Image(); spriteBoss.src = 'boss.png';
+        const menuImage = new Image(); menuImage.src = 'menu.png';
+        const miniBossSprites = [new Image(), new Image(), new Image()];
+        miniBossSprites[0].src = 'miniboss1.png';
+        miniBossSprites[1].src = 'miniboss2.png';
+        miniBossSprites[2].src = 'miniboss3.png';
+        const spriteDead = new Image(); spriteDead.src = '8bit_dead.png';
+        const spriteJump = new Image(); spriteJump.src = '8bit_jump.png';
+
+        // ===== СОСТОЯНИЕ =====
+        const state = {
+            scene: 'menu',
+            paused: false,
+            currentLevel: 1,
+            hp: 100, maxHp: 100,
+            keys: {},
+            superCharge: 0, superMax: 100,
+            player: {
+                x: 100, y: 400, width: 60, height: 60,
+                vx: 0, facing: 1, speed: 2.5,
+                shootCooldown: 0
+            },
+            bullets: [], enemyBullets: [],
+            enemies: [], turrets: [],
+            dialogQueue: [], dialogIndex: 0,
+            touch: { left: false, right: false, shoot: false },
+            particles: [],
+            time: 0,
+            bossActive: false,
+            deathTime: 0
+        };
+
+        for (let i = 0; i < 40; i++) {
+            state.particles.push({
+                x: Math.random() * 900, y: Math.random() * 550,
+                vx: (Math.random() - 0.5) * 0.5,
+                vy: (Math.random() - 0.5) * 0.5,
+                size: Math.random() * 3 + 1,
+                color: ['#0ff', '#0f0', '#f0f', '#ff0'][Math.floor(Math.random() * 4)]
+            });
+        }
+
+        // ===== ГЕНЕРАЦИЯ УРОВНЕЙ =====
+        function generateLevel(levelNum) {
+            if (levelNum === TOTAL_LEVELS) {
+                return {
+                    isBoss: true, isMiniBoss: false,
+                    enemyCount: 1,
+                    enemyHp: 400, enemySpeed: 0.6,
+                    shootCooldown: 700, damage: 20,
+                    bossName: 'СБОЙ СИСТЕМЫ'
+                };
+            }
+            if (MINI_BOSS_LEVELS.includes(levelNum)) {
+                const idx = MINI_BOSS_LEVELS.indexOf(levelNum);
+                const miniCfg = [
+                    { hp: 150, speed: 0.7, shootCooldown: 900, damage: 12, name: 'ГЛЮК' },
+                    { hp: 220, speed: 0.8, shootCooldown: 750, damage: 14, name: 'ПЕРЕГРЕВ' },
+                    { hp: 300, speed: 0.9, shootCooldown: 600, damage: 16, name: 'ЗОЛОТОЙ БАГ' }
+                ][idx];
+                return {
+                    isBoss: true, isMiniBoss: true, miniBossIndex: idx,
+                    enemyCount: 1,
+                    enemyHp: miniCfg.hp, enemySpeed: miniCfg.speed,
+                    shootCooldown: miniCfg.shootCooldown, damage: miniCfg.damage,
+                    bossName: miniCfg.name
+                };
+            }
+            const diff = levelNum;
+            const enemyCount = Math.min(2 + Math.floor((diff - 1) / 2), 6);
+            const enemyHp = 25 + diff * 5;
+            const enemySpeed = 0.6 + diff * 0.06;
+            const shootCooldown = Math.max(500, 1600 - diff * 70);
+            const damage = Math.min(6 + Math.floor(diff / 2), 14);
+            return { isBoss: false, isMiniBoss: false, enemyCount, enemyHp, enemySpeed, shootCooldown, damage };
+        }
+
+        function spawnLevel(levelNum) {
+            state.currentLevel = levelNum;
+            state.hp = 100;
+            state.player.x = 100;
+            state.superCharge = 0;
+            state.bullets = [];
+            state.enemyBullets = [];
+            state.turrets = [];
+            state.deathTime = 0;
+
+            const cfg = generateLevel(levelNum);
+
+            if (cfg.isBoss) {
+                const size = cfg.isMiniBoss ? 95 : 110;
+                state.enemies = [{
+                    x: 700, y: 400 - size,
+                    width: size, height: size,
+                    hp: cfg.enemyHp, maxHp: cfg.enemyHp,
+                    alive: true, speed: cfg.enemySpeed,
+                    shootCooldown: 0,
+                    baseShootCooldown: cfg.shootCooldown,
+                    damage: cfg.damage,
+                    isBoss: true,
+                    isMiniBoss: cfg.isMiniBoss,
+                    miniBossIndex: cfg.miniBossIndex
+                }];
+                state.bossActive = true;
+            } else {
+                state.enemies = [];
+                const startX = 900;
+                const spacing = 90;
+                for (let i = 0; i < cfg.enemyCount; i++) {
+                    state.enemies.push({
+                        x: startX + i * spacing,
+                        y: 400,
+                        width: 55, height: 55,
+                        hp: cfg.enemyHp, maxHp: cfg.enemyHp,
+                        alive: true, speed: cfg.enemySpeed,
+                        shootCooldown: Math.random() * 1000,
+                        baseShootCooldown: cfg.shootCooldown,
+                        damage: cfg.damage,
+                        isBoss: false
+                    });
+                }
+                state.bossActive = false;
+            }
+            updateSuperUI();
+        }
+
+        // ===== ОТРИСОВКА =====
+        function draw8Bit(x, y, facing) {
+            const w = 60, h = 60;
+            ctx.save();
+            ctx.translate(x + w / 2, y + h / 2);
+            if (facing === -1) ctx.scale(-1, 1);
+            if (sprite8Bit.complete && sprite8Bit.naturalWidth > 0) {
+                ctx.drawImage(sprite8Bit, -w / 2, -h / 2, w, h);
+            } else {
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(-w / 2, -h / 2 + 10, w, h - 20);
+                ctx.fillStyle = '#111';
+                ctx.fillRect(-w / 2 + 8, -h / 2 + 18, w - 16, 20);
+                ctx.fillStyle = '#0ff';
+                ctx.fillRect(-w / 2 + 14, -h / 2 + 24, 12, 12);
+                ctx.fillRect(w / 2 - 26, -h / 2 + 24, 12, 12);
+            }
+            ctx.restore();
+        }
+
+        function drawEnemy(enemy) {
+            if (!enemy.alive) return;
+            ctx.save();
+            ctx.translate(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2);
+
+            let drew = false;
+            if (enemy.isMiniBoss && enemy.miniBossIndex !== undefined) {
+                const sprite = miniBossSprites[enemy.miniBossIndex];
+                if (sprite.complete && sprite.naturalWidth > 0) {
+                    ctx.drawImage(sprite, -enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
+                    drew = true;
+                }
+            } else if (enemy.isBoss && spriteBoss.complete && spriteBoss.naturalWidth > 0) {
+                ctx.drawImage(spriteBoss, -enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
+                drew = true;
+            } else if (!enemy.isBoss && sprite8Bit.complete && sprite8Bit.naturalWidth > 0) {
+                ctx.scale(-1, 1);
+                ctx.drawImage(sprite8Bit, -enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.4)';
+                ctx.fillRect(-enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
+                drew = true;
+            }
+            if (!drew) {
+                ctx.fillStyle = enemy.isBoss ? '#800' : '#c00';
+                ctx.fillRect(-enemy.width / 2, -enemy.height / 2, enemy.width, enemy.height);
+            }
+            ctx.restore();
+
+            const hpPercent = enemy.hp / enemy.maxHp;
+            ctx.fillStyle = '#333';
+            ctx.fillRect(enemy.x, enemy.y - 12, enemy.width, 6);
+            ctx.fillStyle = enemy.isBoss ? '#f0f' : '#0f0';
+            ctx.fillRect(enemy.x, enemy.y - 12, enemy.width * hpPercent, 6);
+
+            if (enemy.isBoss) {
+                const cfg = generateLevel(state.currentLevel);
+                ctx.fillStyle = enemy.isMiniBoss ? '#ff0' : '#f0f';
+                ctx.font = 'bold 11px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText(cfg.bossName || 'БОСС', enemy.x + enemy.width / 2, enemy.y - 18);
+            }
+        }
+
+        function drawTurret(t) {
+            ctx.fillStyle = '#ff0';
+            ctx.fillRect(t.x, t.y, 30, 30);
+            ctx.fillStyle = '#f80';
+            ctx.fillRect(t.x + 5, t.y + 5, 20, 20);
+            ctx.fillStyle = '#000';
+            ctx.fillRect(t.x + 10, t.y + 10, 10, 10);
+            ctx.fillStyle = '#888';
+            ctx.fillRect(t.x + (t.facing === 1 ? 28 : -10), t.y + 12, 12, 6);
+        }
+
+        function drawBullet(b, isEnemy) {
+            ctx.fillStyle = isEnemy ? '#f0f' : '#0ff';
+            ctx.fillRect(b.x, b.y, 10, 5);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(b.x + 2, b.y + 1, 6, 3);
+        }
+
+        function drawBackground() {
+            const cfg = generateLevel(state.currentLevel);
+            let hue = (state.currentLevel * 25) % 360;
+            if (cfg.isBoss) hue = cfg.isMiniBoss ? 45 : 300;
+            ctx.fillStyle = `hsl(${hue}, 30%, 15%)`;
+            ctx.fillRect(0, 0, 900, 410);
+            ctx.fillStyle = '#222';
+            ctx.fillRect(0, 450, 900, 100);
+            ctx.fillStyle = '#333';
+            for (let i = 0; i < 900; i += 45) ctx.fillRect(i, 450, 22, 100);
+            ctx.fillStyle = '#444';
+            for (let i = 0; i < 900; i += 45) ctx.fillRect(i, 410, 43, 40);
+            ctx.fillStyle = '#666';
+            for (let i = 0; i < 25; i++) {
+                ctx.fillRect((i * 73 + 17) % 900, (i * 47 + 31) % 410, 2, 2);
+            }
+            ctx.fillStyle = 'rgba(255,255,255,0.04)';
+            ctx.font = 'bold 200px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText(state.currentLevel, 450, 300);
+        }
+
+        // ===== ДИАЛОГИ =====
+        function startDialog(arr) {
+            state.dialogQueue = arr;
+            state.dialogIndex = 0;
+            state.scene = 'dialog';
+            showCurrentDialog();
+        }
+        function showCurrentDialog() {
+            if (state.dialogIndex >= state.dialogQueue.length) { endDialog(); return; }
+            const line = state.dialogQueue[state.dialogIndex];
+            speakerName.textContent = line.speaker;
+            dialogText.textContent = line.text;
+            dialogBox.style.display = 'block';
+            if (isTouchDevice()) btnDialog.style.display = 'flex';
+        }
+        function nextDialog() {
+            state.dialogIndex++;
+            if (state.dialogIndex >= state.dialogQueue.length) endDialog();
+            else showCurrentDialog();
+        }
+        function endDialog() {
+            dialogBox.style.display = 'none';
+            btnDialog.style.display = 'none';
+            state.scene = 'playing';
+        }
+
+        function getIntroDialog(level) {
+            if (level === TOTAL_LEVELS) {
+                return [
+                    { speaker: 'СИСТЕМА', text: `УРОВЕНЬ ${level}: ФИНАЛЬНЫЙ БОСС` },
+                    { speaker: 'VIRUS', text: 'Ты добрался до меня... Но это ничего не меняет!' },
+                    { speaker: 'VIRUS', text: 'Я — СБОЙ СИСТЕМЫ. Я — конец твоего кода!' },
+                    { speaker: '8-BIT', text: 'Error 404: Your victory not found!' },
+                    { speaker: '8-BIT', text: 'Let\'s dance, virus!' }
+                ];
+            }
+            if (MINI_BOSS_LEVELS.includes(level)) {
+                const idx = MINI_BOSS_LEVELS.indexOf(level);
+                const miniDialogs = [
+                    [
+                        { speaker: 'СИСТЕМА', text: `УРОВЕНЬ ${level}: МИНИ-БОСС` },
+                        { speaker: 'ГЛЮК', text: 'Я — глюк в твоём коде!' },
+                        { speaker: 'ГЛЮК', text: 'Ты не сможешь меня отладить!' },
+                        { speaker: '8-BIT', text: 'Debug mode: ON.' }
+                    ],
+                    [
+                        { speaker: 'СИСТЕМА', text: `УРОВЕНЬ ${level}: МИНИ-БОСС` },
+                        { speaker: 'ПЕРЕГРЕВ', text: 'Температура растёт... я плавлюсь!' },
+                        { speaker: 'ПЕРЕГРЕВ', text: 'Но сначала — расплавлю тебя!' },
+                        { speaker: '8-BIT', text: 'Cooling system: activated.' }
+                    ],
+                    [
+                        { speaker: 'СИСТЕМА', text: `УРОВЕНЬ ${level}: МИНИ-БОСС` },
+                        { speaker: 'ЗОЛОТОЙ БАГ', text: 'Я — самый редкий баг в системе!' },
+                        { speaker: 'ЗОЛОТОЙ БАГ', text: 'Меня не исправить. Меня можно только бояться!' },
+                        { speaker: '8-BIT', text: 'Patch notes: you are deleted.' }
+                    ]
+                ];
+                return miniDialogs[idx];
+            }
+            const tips = [
+                null,
+                'Добро пожаловать! Уничтожь вирусы и заряди супер.',
+                'Супер заряжается от попаданий. Турель стреляет сама!',
+                'Помни: повторный супер уничтожает старую турель.',
+                'Осторожно — впереди МИНИ-БОСС на 5-м уровне!',
+                'МИНИ-БОСС! Он сильнее обычных врагов.',
+                'Уворачивайся от пуль — они больно бьют!',
+                'Твоя турель — твой лучший друг.',
+                'Скорость врагов растёт. Будь начеку.',
+                'На 10-м уровне — второй МИНИ-БОСС!',
+                'МИНИ-БОСС "ПЕРЕГРЕВ". Не дай ему перегреться!',
+                'Супер копится быстро — используй его чаще.',
+                'Враги стреляют чаще. Уворачивайся!',
+                'Почти у цели. Ещё немного!',
+                'На 15-м — ЗОЛОТОЙ БАГ. Последний мини-босс!',
+                'Дальше только ФИНАЛЬНЫЙ БОСС!'
+            ];
+            return [
+                { speaker: 'СИСТЕМА', text: `УРОВЕНЬ ${level}` },
+                { speaker: '8-BIT', text: 'Player One, get ready!' },
+                { speaker: 'СИСТЕМА', text: tips[level] || 'Уничтожь всех врагов!' }
+            ];
+        }
+
+        // ===== СУПЕР =====
+        function activateSuper() {
+            if (state.superCharge < state.superMax) return;
+            state.turrets = [];
+            state.turrets.push({
+                x: state.player.x + (state.player.facing === 1 ? 60 : -60),
+                y: 420, width: 30, height: 30,
+                facing: state.player.facing,
+                shootCooldown: 0, lifetime: 10000
+            });
+            state.superCharge = 0;
+            updateSuperUI();
+            vibrate(50);
+        }
+        function updateSuperUI() {
+            superCount.textContent = Math.floor(state.superCharge);
+            superFill.style.width = (state.superCharge / state.superMax * 100) + '%';
+            if (state.superCharge >= state.superMax) btnSuper.classList.add('ready');
+            else btnSuper.classList.remove('ready');
+        }
+        function addSuperCharge(amount) {
+            state.superCharge = Math.min(state.superMax, state.superCharge + amount);
+            updateSuperUI();
+        }
+        function vibrate(ms) {
+            if (save.settings.vibe && navigator.vibrate) {
+                try { navigator.vibrate(ms); } catch (e) {}
+            }
+        }
+
+        // ===== ОБНОВЛЕНИЕ =====
+        function update(dt) {
+            state.time += dt;
+            state.particles.forEach(p => {
+                p.x += p.vx; p.y += p.vy;
+                if (p.x < 0 || p.x > 900) p.vx *= -1;
+                if (p.y < 0 || p.y > 550) p.vy *= -1;
+            });
+
+            if (state.paused) return;
+            if (state.scene === 'dialog' || state.scene === 'menu') return;
+            if (state.scene !== 'playing') return;
+
+            const player = state.player;
+
+            if (state.keys['a'] || state.keys['A'] || state.keys['ф'] || state.touch.left) {
+                player.vx = -player.speed; player.facing = -1;
+            } else if (state.keys['d'] || state.keys['D'] || state.keys['в'] || state.touch.right) {
+                player.vx = player.speed; player.facing = 1;
+            } else player.vx = 0;
+            player.x += player.vx;
+            if (player.x < 20) player.x = 20;
+            if (player.x > 880 - player.width) player.x = 880 - player.width;
+
+            player.shootCooldown -= dt;
+            if ((state.keys[' '] || state.keys['space'] || state.touch.shoot) && player.shootCooldown <= 0) {
+                let dir = player.facing;
+                if (save.settings.autolock) {
+                    let nearest = null, minDist = Infinity;
+                    state.enemies.forEach(e => {
+                        if (!e.alive) return;
+                        const d = Math.abs(e.x - player.x);
+                        if (d < minDist) { minDist = d; nearest = e; }
+                    });
+                    if (nearest) dir = nearest.x > player.x ? 1 : -1;
+                    player.facing = dir;
+                }
+                state.bullets.push({
+                    x: dir === 1 ? player.x + player.width : player.x - 10,
+                    y: player.y + 25,
+                    vx: dir * 10, damage: 10
+                });
+                player.shootCooldown = 180;
+            }
+
+            state.bullets = state.bullets.filter(b => { b.x += b.vx; return b.x > -50 && b.x < 950; });
+            state.enemyBullets = state.enemyBullets.filter(b => { b.x += b.vx; return b.x > -50 && b.x < 950; });
+
+            state.turrets.forEach((t, ti) => {
+                t.shootCooldown -= dt;
+                t.lifetime -= dt;
+                if (t.shootCooldown <= 0) {
+                    state.bullets.push({
+                        x: t.x + (t.facing === 1 ? 30 : -10),
+                        y: t.y + 12, vx: t.facing * 12, damage: 8
+                    });
+                    t.shootCooldown = 150;
+                }
+                if (t.lifetime <= 0) state.turrets.splice(ti, 1);
+            });
+
+            state.enemies.forEach(enemy => {
+                if (!enemy.alive) return;
+                if (enemy.x > player.x + 60) enemy.x -= enemy.speed;
+                else if (enemy.x < player.x - 60) enemy.x += enemy.speed;
+
+                enemy.shootCooldown -= dt;
+                if (enemy.shootCooldown <= 0) {
+                    const dir = enemy.x > player.x ? -1 : 1;
+                    state.enemyBullets.push({
+                        x: enemy.x + enemy.width / 2,
+                        y: enemy.y + 25,
+                        vx: dir * (enemy.isBoss ? 4 : 3),
+                        damage: enemy.damage || (enemy.isBoss ? 20 : 8)
+                    });
+                    enemy.shootCooldown = enemy.baseShootCooldown || (enemy.isBoss ? 700 : 1500);
+                }
+
+                state.bullets.forEach((bullet, bi) => {
+                    if (bullet.x < enemy.x + enemy.width &&
+                        bullet.x + 10 > enemy.x &&
+                        bullet.y < enemy.y + enemy.height &&
+                        bullet.y + 5 > enemy.y) {
+                        enemy.hp -= bullet.damage;
+                        state.bullets.splice(bi, 1);
+                        addSuperCharge(5);
+                        vibrate(15);
+                        if (enemy.hp <= 0) {
+                            enemy.alive = false;
+                            addSuperCharge(20);
+                            vibrate(100);
+                        }
+                    }
+                });
+
+                if (enemy.alive &&
+                    player.x < enemy.x + enemy.width &&
+                    player.x + player.width > enemy.x &&
+                    player.y < enemy.y + enemy.height &&
+                    player.y + player.height > enemy.y) {
+                    state.hp -= 0.3;
+                }
+            });
+
+            state.enemyBullets.forEach((b, bi) => {
+                if (player.x < b.x + 10 && player.x + player.width > b.x &&
+                    player.y < b.y + 5 && player.y + player.height > b.y) {
+                    state.hp -= b.damage;
+                    state.enemyBullets.splice(bi, 1);
+                    addSuperCharge(3);
+                    vibrate(30);
+                }
+            });
+
+            if (state.enemies.every(e => !e.alive) && state.scene === 'playing') {
+                onLevelComplete();
+            }
+            if (state.hp <= 0) {
+                state.hp = 0;
+                onGameOver();
+            }
+
+            hpDisplay.textContent = Math.max(0, Math.floor(state.hp));
+            levelDisplay.textContent = state.currentLevel;
+        }
+
+        // ===== СОБЫТИЯ =====
+        function onLevelComplete() {
+            state.scene = 'level-complete';
+            const lvl = state.currentLevel;
+
+            if (!save.completed.includes(lvl)) save.completed.push(lvl);
+            if (lvl < TOTAL_LEVELS && save.unlockedLevel < lvl + 1) {
+                save.unlockedLevel = lvl + 1;
+                showToast(`🔓 УРОВЕНЬ ${lvl + 1} РАЗБЛОКИРОВАН!`);
+            }
+            writeSave(save);
+
+            if (lvl === TOTAL_LEVELS) {
+                document.getElementById('modal-game-win').classList.add('active');
+            } else {
+                document.getElementById('win-title').textContent = `УРОВЕНЬ ${lvl} ПРОЙДЕН!`;
+                document.getElementById('win-text').textContent =
+                    lvl + 1 === TOTAL_LEVELS
+                        ? 'Финальный босс разблокирован! Готов?'
+                        : `Уровень ${lvl + 1} разблокирован.`;
+                document.getElementById('modal-level-win').classList.add('active');
+            }
+        }
+
+        function onGameOver() {
+            state.scene = 'gameover';
+            state.deathTime = 0;
+            setTimeout(() => {
+                if (confirm(`Уровень ${state.currentLevel} провален. Попробовать заново?`)) {
+                    startLevel(state.currentLevel);
+                } else {
+                    showMenu();
+                }
+            }, 500);
+        }
+
+        function showToast(text) {
+            unlockToast.textContent = text;
+            unlockToast.classList.add('show');
+            setTimeout(() => unlockToast.classList.remove('show'), 2000);
+        }
+
+        // ===== ЭКРАН ПОБЕДЫ =====
+        function drawWinScreen() {
+            drawBackground();
+
+            const jumpHeight = 40;
+            const jumpSpeed = 0.006;
+            const jumpOffset = -Math.abs(Math.sin(state.time * jumpSpeed)) * jumpHeight;
+
+            const w = 140, h = 140;
+            const x = 450 - w / 2;
+            const y = 220 + jumpOffset;
+
+            const shadowScale = 1 - Math.abs(jumpOffset) / 100;
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
+            ctx.beginPath();
+            ctx.ellipse(450, 380, 50 * shadowScale, 10 * shadowScale, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (spriteJump.complete && spriteJump.naturalWidth > 0) {
+                ctx.drawImage(spriteJump, x, y, w, h);
+            } else if (sprite8Bit.complete && sprite8Bit.naturalWidth > 0) {
+                ctx.drawImage(sprite8Bit, x, y, w, h);
+            }
+
+            ctx.fillStyle = '#0f0';
+            ctx.font = 'bold 50px Courier New';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#0f0';
+            ctx.shadowBlur = 20;
+            ctx.fillText('VICTORY', 450, 130);
+            ctx.shadowBlur = 0;
+
+            ctx.fillStyle = '#ff0';
+            ctx.font = 'bold 24px Courier New';
+            ctx.fillText('All I do is win!', 450, 480);
+
+            ctx.fillStyle = '#0ff';
+            ctx.font = '16px Courier New';
+            ctx.fillText('New high score!', 450, 510);
+        }
+
+        // ===== ЭКРАН ПОРАЖЕНИЯ =====
+        function drawGameOverScreen() {
+            drawBackground();
+
+            const w = 160, h = 160;
+            const x = 450 - w / 2;
+            const y = 200;
+
+            if (spriteDead.complete && spriteDead.naturalWidth > 0) {
+                ctx.drawImage(spriteDead, x, y, w, h);
+            } else if (sprite8Bit.complete && sprite8Bit.naturalWidth > 0) {
+                ctx.save();
+                ctx.translate(450, 280);
+                ctx.rotate(Math.PI / 2);
+                ctx.drawImage(sprite8Bit, -60, -60, 120, 120);
+                ctx.restore();
+            }
+
+            ctx.fillStyle = '#f00';
+            ctx.font = 'bold 55px Courier New';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#f00';
+            ctx.shadowBlur = 20;
+            ctx.fillText('GAME OVER', 450, 130);
+            ctx.shadowBlur = 0;
+
+            ctx.fillStyle = '#fff';
+            ctx.font = '20px Courier New';
+            ctx.fillText('8-BIT defeated...', 450, 480);
+
+            ctx.fillStyle = '#888';
+            ctx.font = '14px Courier New';
+            ctx.fillText('R-r-r-ebooting...', 450, 510);
+        }
+
+        // ===== РЕНДЕР =====
+        function render() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, 900, 550);
+
+            if (state.scene === 'menu') {
+                state.particles.forEach(p => {
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = 0.3;
+                    ctx.fillRect(p.x, p.y, p.size, p.size);
+                });
+                ctx.globalAlpha = 1;
+
+                if (menuImage.complete && menuImage.naturalWidth > 0) {
+                    const imgRatio = menuImage.width / menuImage.height;
+                    const canvasRatio = 900 / 550;
+                    let dw, dh, dx, dy;
+                    if (imgRatio > canvasRatio) {
+                        dw = 900; dh = 900 / imgRatio;
+                        dx = 0; dy = (550 - dh) / 2;
+                    } else {
+                        dh = 550; dw = 550 * imgRatio;
+                        dx = (900 - dw) / 2; dy = 0;
+                    }
+                    const offsetY = Math.sin(state.time / 800) * 4;
+                    ctx.drawImage(menuImage, dx, dy + offsetY, dw, dh);
+                } else {
+                    ctx.fillStyle = '#0f0';
+                    ctx.font = 'bold 60px Courier New';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('8-BIT', 450, 250);
+                    ctx.font = '20px Courier New';
+                    ctx.fillText('16 LEVELS', 450, 290);
+                }
+                return;
+            }
+
+            if (state.scene === 'victory') {
+                drawWinScreen();
+                return;
+            }
+
+            if (state.scene === 'gameover') {
+                state.deathTime += 16;
+                drawGameOverScreen();
+                return;
+            }
+
+            if (state.scene === 'playing' || state.scene === 'dialog' || state.scene === 'level-complete') {
+                drawBackground();
+                state.turrets.forEach(drawTurret);
+                state.enemies.forEach(drawEnemy);
+                state.bullets.forEach(b => drawBullet(b, false));
+                state.enemyBullets.forEach(b => drawBullet(b, true));
+                draw8Bit(state.player.x, state.player.y, state.player.facing);
+
+                ctx.fillStyle = 'rgba(0,255,0,0.7)';
+                ctx.font = 'bold 14px Courier New';
+                ctx.textAlign = 'right';
+                ctx.fillText(`УРОВЕНЬ ${state.currentLevel}/${TOTAL_LEVELS}`, 890, 540);
+            }
+        }
+
+        let lastTime = 0;
+        function gameLoop(ts) {
+            const dt = Math.min(ts - lastTime, 50);
+            lastTime = ts;
+            update(dt);
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function isTouchDevice() {
+            return ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+        }
+
+        function showHUD() {
+            hud.style.display = 'block';
+            superBar.style.display = 'block';
+            superLabel.style.display = 'block';
+            btnPause.style.display = 'flex';
+        }
+        function hideHUD() {
+            hud.style.display = 'none';
+            superBar.style.display = 'none';
+            superLabel.style.display = 'none';
+            btnPause.style.display = 'none';
+        }
+        function showMenu() {
+            state.scene = 'menu';
+            state.paused = false;
+            menuOverlay.style.display = 'flex';
+            hideHUD();
+            dialogBox.style.display = 'none';
+            btnDialog.style.display = 'none';
+            document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+        }
+
+        function startLevel(levelNum) {
+            menuOverlay.style.display = 'none';
+            document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+            showHUD();
+            spawnLevel(levelNum);
+            state.scene = 'dialog';
+
+            const dialog = getIntroDialog(levelNum);
+            state.dialogQueue = dialog;
+            state.dialogIndex = 0;
+            showCurrentDialog();
+        }
+
+        // ===== UI =====
+        document.getElementById('btn-play').addEventListener('click', () => {
+            startLevel(save.unlockedLevel || 1);
+        });
+        document.getElementById('btn-levels').addEventListener('click', () => {
+            renderLevelGrid();
+            document.getElementById('modal-levels').classList.add('active');
+        });
+        document.getElementById('btn-settings').addEventListener('click', () => {
+            document.getElementById('modal-settings').classList.add('active');
+        });
+        document.getElementById('btn-about').addEventListener('click', () => {
+            document.getElementById('modal-about').classList.add('active');
+        });
+
+        function renderLevelGrid() {
+            const grid = document.getElementById('level-grid');
+            grid.innerHTML = '';
+            for (let i = 1; i <= TOTAL_LEVELS; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'level-cell';
+                const isFinalBoss = i === TOTAL_LEVELS;
+                const isMini = MINI_BOSS_LEVELS.includes(i);
+                const unlocked = i <= save.unlockedLevel;
+                const completed = save.completed.includes(i);
+
+                if (isFinalBoss) cell.classList.add('boss-level');
+                if (isMini && !isFinalBoss) cell.classList.add('miniboss-level');
+                if (!unlocked) cell.classList.add('locked');
+                else if (completed) cell.classList.add('completed');
+
+                let icon = i;
+                if (isFinalBoss) icon = '👹';
+                else if (isMini) icon = '⭐';
+
+                cell.innerHTML = `<span>${icon}</span>`;
+                if (unlocked) {
+                    cell.addEventListener('click', () => {
+                        document.getElementById('modal-levels').classList.remove('active');
+                        startLevel(i);
+                    });
+                }
+                grid.appendChild(cell);
+            }
+        }
+
+        document.querySelectorAll('[data-close]').forEach(el => {
+            el.addEventListener('click', () => {
+                document.getElementById(el.dataset.close).classList.remove('active');
+            });
+        });
+
+        btnPause.addEventListener('click', () => {
+            if (state.scene === 'playing') {
+                state.paused = true;
+                document.getElementById('modal-pause').classList.add('active');
+            }
+        });
+        document.getElementById('btn-resume').addEventListener('click', () => {
+            state.paused = false;
+            document.getElementById('modal-pause').classList.remove('active');
+        });
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            state.paused = false;
+            document.getElementById('modal-pause').classList.remove('active');
+            startLevel(state.currentLevel);
+        });
+        document.getElementById('btn-to-menu').addEventListener('click', () => {
+            state.paused = false;
+            showMenu();
+        });
+
+        document.getElementById('btn-next-level').addEventListener('click', () => {
+            document.getElementById('modal-level-win').classList.remove('active');
+            state.scene = 'victory';
+            setTimeout(() => {
+                startLevel(state.currentLevel + 1);
+            }, 2500);
+        });
+        document.getElementById('btn-win-to-menu').addEventListener('click', showMenu);
+
+        document.getElementById('btn-win-restart').addEventListener('click', () => {
+            document.getElementById('modal-game-win').classList.remove('active');
+            state.scene = 'victory';
+            setTimeout(() => startLevel(1), 2500);
+        });
+        document.getElementById('btn-win-menu').addEventListener('click', showMenu);
+
+        function syncSettingsUI() {
+            document.getElementById('toggle-music').classList.toggle('on', save.settings.music);
+            document.getElementById('toggle-sfx').classList.toggle('on', save.settings.sfx);
+            document.getElementById('toggle-vibe').classList.toggle('on', save.settings.vibe);
+            document.getElementById('toggle-autolock').classList.toggle('on', save.settings.autolock);
+        }
+        syncSettingsUI();
+
+        document.getElementById('toggle-music').addEventListener('click', function () {
+            save.settings.music = !save.settings.music;
+            this.classList.toggle('on', save.settings.music);
+            writeSave(save);
+            updateMusic();
+        });
+        document.getElementById('toggle-sfx').addEventListener('click', function () {
+            save.settings.sfx = !save.settings.sfx;
+            this.classList.toggle('on', save.settings.sfx);
+            writeSave(save);
+        });
+        document.getElementById('toggle-vibe').addEventListener('click', function () {
+            save.settings.vibe = !save.settings.vibe;
+            this.classList.toggle('on', save.settings.vibe);
+            writeSave(save);
+        });
+        document.getElementById('toggle-autolock').addEventListener('click', function () {
+            save.settings.autolock = !save.settings.autolock;
+            this.classList.toggle('on', save.settings.autolock);
+            writeSave(save);
+        });
+
+        // ===== СЕКРЕТНЫЙ КОД =====
+        const SECRET_CODE = '0824';
+
+        document.getElementById('btn-code').addEventListener('click', () => {
+            document.getElementById('modal-settings').classList.remove('active');
+            document.getElementById('modal-code').classList.add('active');
+            document.getElementById('code-input').value = '';
+            document.getElementById('code-message').textContent = '';
+            setTimeout(() => document.getElementById('code-input').focus(), 100);
+        });
+
+        function submitCode() {
+            const input = document.getElementById('code-input').value.trim();
+            const msg = document.getElementById('code-message');
+
+            if (input === SECRET_CODE) {
+                save.unlockedLevel = TOTAL_LEVELS;
+                save.completed = [];
+                for (let i = 1; i < TOTAL_LEVELS; i++) {
+                    save.completed.push(i);
+                }
+                writeSave(save);
+
+                msg.style.color = '#0f0';
+                msg.textContent = '✓ ВСЕ УРОВНИ РАЗБЛОКИРОВАНЫ!';
+                vibrate(200);
+
+                setTimeout(() => {
+                    document.getElementById('modal-code').classList.remove('active');
+                    showToast('🔓 ВСЕ УРОВНИ ОТКРЫТЫ!');
+                }, 1500);
+            } else {
+                msg.style.color = '#f00';
+                msg.textContent = '✗ НЕВЕРНЫЙ КОД';
+                vibrate(100);
+                document.getElementById('code-input').value = '';
+            }
+        }
+
+        document.getElementById('btn-code-submit').addEventListener('click', submitCode);
+        document.getElementById('code-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') submitCode();
+        });
+
+        function updateMusic() {
+            if (save.settings.music) {
+                bgMusic.volume = 0.3;
+                bgMusic.play().catch(() => {});
+            } else {
+                bgMusic.pause();
+            }
+        }
+        function firstInteraction() {
+            updateMusic();
+            window.removeEventListener('touchstart', firstInteraction);
+            window.removeEventListener('click', firstInteraction);
+            window.removeEventListener('keydown', firstInteraction);
+        }
+        window.addEventListener('touchstart', firstInteraction, { once: true });
+        window.addEventListener('click', firstInteraction, { once: true });
+        window.addEventListener('keydown', firstInteraction, { once: true });
+
+        window.addEventListener('keydown', (e) => {
+            state.keys[e.key] = true;
+            if (state.scene === 'menu' && e.key === 'Enter') {
+                startLevel(save.unlockedLevel || 1);
+                return;
+            }
+            if (state.paused) return;
+            if (state.scene === 'dialog' && (e.key === 'e' || e.key === 'E' || e.key === 'у')) {
+                nextDialog();
+            }
+            if (e.key === 'q' || e.key === 'Q' || e.key === 'й') {
+                activateSuper();
+            }
+            if (e.key === 'Escape' && state.scene === 'playing') {
+                state.paused = true;
+                document.getElementById('modal-pause').classList.add('active');
+            }
+        });
+        window.addEventListener('keyup', (e) => { state.keys[e.key] = false; });
+
+        function bindTouchButton(id, onDown, onUp) {
+            const btn = document.getElementById(id);
+            const down = (e) => { e.preventDefault(); btn.classList.add('pressed'); onDown(); };
+            const up = (e) => { e.preventDefault(); btn.classList.remove('pressed'); if (onUp) onUp(); };
+            btn.addEventListener('touchstart', down, { passive: false });
+            btn.addEventListener('touchend', up, { passive: false });
+            btn.addEventListener('touchcancel', up, { passive: false });
+            btn.addEventListener('mousedown', down);
+            btn.addEventListener('mouseup', up);
+            btn.addEventListener('mouseleave', up);
+        }
+        bindTouchButton('btn-left',
+            () => { state.touch.left = true; },
+            () => { state.touch.left = false; });
+        bindTouchButton('btn-right',
+            () => { state.touch.right = true; },
+            () => { state.touch.right = false; });
+        bindTouchButton('btn-shoot',
+            () => { state.touch.shoot = true; },
+            () => { state.touch.shoot = false; });
+
+        btnSuper.addEventListener('touchstart', (e) => { e.preventDefault(); btnSuper.classList.add('pressed'); activateSuper(); }, { passive: false });
+        btnSuper.addEventListener('touchend', (e) => { e.preventDefault(); btnSuper.classList.remove('pressed'); }, { passive: false });
+        btnSuper.addEventListener('click', () => activateSuper());
+
+        btnDialog.addEventListener('touchstart', (e) => { e.preventDefault(); nextDialog(); }, { passive: false });
+        btnDialog.addEventListener('click', (e) => { e.preventDefault(); nextDialog(); });
+
+        updateSuperUI();
+        showMenu();
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
